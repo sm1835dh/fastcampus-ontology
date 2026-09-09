@@ -8,6 +8,7 @@
   },
   "scripts": {
     "ontology": "pnpm --filter @fastcampus/ontology run start",
+    "run-sql": "node --env-file=.env run-sql.ts",
     "typecheck": "pnpm -r run typecheck"
   },
   "devDependencies": {
