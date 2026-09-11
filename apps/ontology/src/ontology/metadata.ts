@@ -203,3 +203,21 @@ export async function requireActionType(objectTypeId: string, apiName: string): 
   if (!row) throw new ApiError(404, `Unknown action '${apiName}'`);
   return row;
 }
+
+/** The two fields the manager lets you edit in place. */
+export type ObjectTypeEdit = {
+  name?: string;
+  description?: string | null;
+};
+
+export async function updateObjectType(apiName: string, edit: ObjectTypeEdit): Promise<ObjectTypeRow> {
+  const updated = await meta()
+    .updateTable("object_type")
+    .set(edit)
+    .where("api_name", "=", apiName)
+    .returningAll()
+    .executeTakeFirst();
+
+  if (!updated) throw new ApiError(404, `Unknown object type '${apiName}'`);
+  return updated;
+}

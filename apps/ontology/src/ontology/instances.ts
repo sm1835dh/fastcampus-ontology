@@ -1,6 +1,6 @@
 import { db } from "../db.ts";
 import { ApiError } from "./errors.ts";
-import { assertColumn } from "./schemas.ts";
+import { assertColumn, type InstanceTable } from "./schemas.ts";
 import type { InstanceRow, PropertyRow, TypeView } from "./metadata.ts";
 
 /**
@@ -71,4 +71,13 @@ export function coerceFilterValue(property: PropertyRow, raw: string): unknown {
       return raw;
     }
   }
+}
+
+/** Row count for one instance table, for the type listing. */
+export async function countInstances(table: InstanceTable): Promise<number> {
+  const row = await db
+    .selectFrom(table)
+    .select((eb) => eb.fn.countAll<string>().as("count"))
+    .executeTakeFirstOrThrow();
+  return Number(row.count);
 }
