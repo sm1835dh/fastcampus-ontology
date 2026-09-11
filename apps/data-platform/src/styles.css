@@ -1,0 +1,440 @@
+/* Layout and the label/value rows the mock is built from. Everything else --
+   colours, type scale, controls -- comes from Blueprint's own stylesheet. */
+
+:root {
+  --om-gap: 16px;
+  --om-rail-width: 260px;
+  --om-page-bg: #f6f7f9;
+  --om-border: rgba(17, 20, 24, 0.15);
+  --om-label: #5f6b7c;
+}
+
+body {
+  margin: 0;
+  background: var(--om-page-bg);
+  color: #1c2127;
+}
+
+.om-layout {
+  display: grid;
+  grid-template-columns: var(--om-rail-width) minmax(0, 1fr);
+  min-height: 100vh;
+  align-items: start;
+}
+
+/* --- left rail --------------------------------------------------------- */
+
+.om-rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  background: #fff;
+  border-right: 1px solid var(--om-border);
+  padding: var(--om-gap) 8px;
+}
+
+.om-rail__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 12px;
+}
+
+.om-rail__title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: var(--om-label);
+}
+
+.om-rail__menu {
+  background: transparent;
+  padding: 0;
+}
+
+/* --- main column ------------------------------------------------------- */
+
+.om-main {
+  padding: 24px;
+  min-width: 0;
+}
+
+.om-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--om-gap);
+  max-width: 1200px;
+}
+
+.om-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.om-header__icon {
+  margin-top: 4px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(45, 114, 210, 0.1);
+}
+
+.om-header__title {
+  margin: 0 0 2px;
+}
+
+/* EditableText renders inline; give it room so an empty value stays clickable. */
+.om-header__title .bp6-editable-text {
+  min-width: 12ch;
+}
+
+.om-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--om-gap);
+}
+
+.om-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--om-gap);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .om-overview,
+  .om-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .om-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .om-rail {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--om-border);
+  }
+}
+
+/* --- label / value rows ------------------------------------------------ */
+
+.om-card {
+  padding: 20px 24px;
+}
+
+.om-field {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 16px;
+  align-items: baseline;
+  padding: 7px 0;
+}
+
+.om-card--status .om-field {
+  grid-template-columns: 120px minmax(0, 1fr);
+}
+
+.om-field__label {
+  color: var(--om-label);
+}
+
+.om-field__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.om-card__rule {
+  border-top: 1px solid var(--om-border);
+  margin: 12px 0;
+}
+
+.om-mono {
+  font-family: var(--bp-font-family-monospace, monospace);
+  font-size: 12px;
+  background: rgba(143, 153, 168, 0.15);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.om-muted {
+  color: var(--om-label);
+}
+
+.om-alert {
+  margin-bottom: var(--om-gap);
+}
+
+.om-spinner {
+  margin: 64px auto;
+}
+
+/* --- lists inside the section cards ------------------------------------ */
+
+.om-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.om-list__divider {
+  margin: 0;
+}
+
+.om-list__label {
+  padding: 10px 20px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--om-label);
+}
+
+.om-property,
+.om-action,
+.om-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 20px;
+}
+
+.om-property:hover,
+.om-action:hover,
+.om-link:hover {
+  background: rgba(143, 153, 168, 0.1);
+}
+
+.om-property__icon {
+  color: var(--om-label);
+}
+
+.om-property__name,
+.om-action__name,
+.om-link__name {
+  font-weight: 500;
+}
+
+/* The api_name trails the row, so the display name stays the thing you read. */
+.om-property__api {
+  margin-left: auto;
+  font-family: var(--bp-font-family-monospace, monospace);
+  font-size: 11px;
+  color: var(--om-label);
+  white-space: nowrap;
+}
+
+.om-action__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.om-link__direction {
+  color: var(--om-label);
+}
+
+.om-link__target.bp6-button {
+  font-weight: 500;
+}
+
+.om-empty {
+  padding: 28px 12px;
+}
+
+.om-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- app shell --------------------------------------------------------- */
+
+.om-shell {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  min-height: 100vh;
+  align-items: stretch;
+}
+
+.om-apps {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0;
+  background: #1c2127;
+  border-right: 1px solid var(--om-border);
+}
+
+/* The rail is dark, so its buttons need the light-on-dark treatment. */
+.om-apps__button.bp6-button {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.om-apps__button.bp6-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.om-apps__button.bp6-button.bp6-active {
+  background: rgba(45, 114, 210, 0.35);
+  color: #fff;
+}
+
+.om-alert--page {
+  margin: 24px;
+  align-self: start;
+}
+
+/* --- explorer ---------------------------------------------------------- */
+
+.om-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  min-height: 24px;
+}
+
+.om-crumbs__trail {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.om-actionstrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--om-border);
+  border-radius: 4px;
+}
+
+.om-table.bp6-html-table {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--om-border);
+  border-radius: 4px;
+}
+
+.om-table th {
+  color: var(--om-label);
+  font-weight: 600;
+}
+
+.om-table tbody tr {
+  cursor: pointer;
+}
+
+.om-table__title {
+  font-weight: 500;
+}
+
+/* Properties and links sit side by side, links a little narrower. */
+.om-columns--detail {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+}
+
+.om-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.om-json {
+  overflow-wrap: anywhere;
+}
+
+.om-linkgroup + .om-linkgroup {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--om-border);
+}
+
+.om-linkgroup__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: var(--om-label);
+}
+
+.om-linkgroup__name {
+  font-weight: 600;
+  color: #1c2127;
+}
+
+/* --- action dialog ----------------------------------------------------- */
+
+.om-dialog.bp6-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.om-required {
+  color: #cd4246;
+}
+
+.om-result {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.om-result li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.om-result__change {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.om-issues {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+/* --- search ------------------------------------------------------------ */
+
+.om-search {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.om-search__input {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.om-search__toggle.bp6-control {
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* A grouped result already sits in a section card; the table drops its own frame. */
+.om-group .om-table.bp6-html-table {
+  border: 0;
+  border-radius: 0;
+}
+
+.om-table__matched {
+  color: var(--om-label);
+  font-size: 12px;
+}
