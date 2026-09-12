@@ -221,3 +221,40 @@ export async function updateObjectType(apiName: string, edit: ObjectTypeEdit): P
   if (!updated) throw new ApiError(404, `Unknown object type '${apiName}'`);
   return updated;
 }
+
+/** One recorded action run against an object, as the audit route returns it. */
+export type AuditEntry = {
+  id: string;
+  /** The action's api_name, snapshotted when it ran. */
+  action: string;
+  /** Its display name now, or null if the action type has since been deleted. */
+  name: string | null;
+  actor: string | null;
+  params: Record<string, unknown> | null;
+  result: Record<string, unknown> | null;
+  createdAt: Date;
+};
+
+/**
+ * The trail for one object, newest first. Matching on the api_name snapshot
+ * rather than the UUID is what lets an entry outlive the metadata it points at;
+ * it is also the indexed pair.
+ */
+export async function auditFor(objectTypeApiName: string, targetId: string): Promise<AuditEntry[]> {
+  return meta()
+    .selectFrom("audit_log")
+    .leftJoin("action_type", "action_type.id", "audit_log.action_type_id")
+    .select([
+      "audit_log.id as id",
+      "audit_log.action_api_name as action",
+      "action_type.name as name",
+      "audit_log.actor as actor",
+      "audit_log.params as params",
+      "audit_log.result as result",
+      "audit_log.created_at as createdAt",
+    ])
+    .where("audit_log.target_type_api_name", "=", objectTypeApiName)
+    .where("audit_log.target_id", "=", targetId)
+    .orderBy("audit_log.created_at", "desc")
+    .execute();
+}

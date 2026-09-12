@@ -10,6 +10,7 @@ import {
   type Filter,
 } from "../ontology/instances.ts";
 import {
+  auditFor,
   isToMany,
   linksOf,
   toApiObject,
@@ -103,6 +104,27 @@ objects.get("/:type/:id", async (c) => {
     id,
     data: toApiObject(row, view.properties),
     links: Object.fromEntries(resolved),
+  });
+});
+
+/** The action history for one object, newest first. */
+objects.get("/:type/:id/audit", async (c) => {
+  const loadType = typeViewCache();
+  const view = await loadType(c.req.param("type"));
+  const id = c.req.param("id");
+
+  // An unknown object gets a 404 rather than an empty trail, which would read
+  // as "nothing has happened to it".
+  const instance = await findInstance(view, id);
+  if (!instance) throw new ApiError(404, `No ${view.objectType.api_name} with id '${id}'`);
+
+  const entries = await auditFor(view.objectType.api_name, id);
+
+  return c.json({
+    type: view.objectType.api_name,
+    id,
+    count: entries.length,
+    data: entries,
   });
 });
 
