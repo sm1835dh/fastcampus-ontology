@@ -1,4 +1,8 @@
 // Relative imports carry the .ts extension — that is what Node 24 resolves at runtime.
+//
+// clock.ts comes first on purpose: it patches the global Date on import, so every
+// module evaluated after it -- and every route handler -- sees the anchored clock.
+import { clock } from "./clock.ts";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { sql } from "kysely";
@@ -37,6 +41,9 @@ const port = Number(process.env["PORT"] ?? 3000);
 
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`ontology listening on http://localhost:${info.port}`);
+  if (clock.anchored) {
+    console.log(`clock anchored at ${clock.anchor?.toISOString()} (COURSE_NOW)`);
+  }
 });
 
 export default app;
