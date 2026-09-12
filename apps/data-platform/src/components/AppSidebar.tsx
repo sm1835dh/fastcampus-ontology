@@ -1,11 +1,12 @@
 import { Button, Tooltip } from "@blueprintjs/core";
 import type { IconName } from "@blueprintjs/icons";
 
-export type AppId = "ontology-manager" | "object-explorer";
+export type AppId = "ontology-manager" | "object-explorer" | "batch-workspace";
 
 const APPS: { id: AppId; label: string; icon: IconName }[] = [
   { id: "ontology-manager", label: "Ontology Manager", icon: "cube" },
   { id: "object-explorer", label: "Object Explorer", icon: "search-template" },
+  { id: "batch-workspace", label: "Batch Investigation Workspace", icon: "lab-test" },
 ];
 
 export default function AppSidebar({ current, onSelect }: { current: AppId; onSelect: (app: AppId) => void }) {

@@ -438,3 +438,155 @@ body {
   color: var(--om-label);
   font-size: 12px;
 }
+
+/* --- batch investigation workspace -------------------------------------- */
+
+.om-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--om-gap);
+}
+
+.om-metric {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+}
+
+.om-metric__icon {
+  padding: 10px;
+  border-radius: 6px;
+  background: rgba(45, 114, 210, 0.1);
+}
+
+.om-metric__value {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.om-metric__label {
+  color: var(--om-label);
+}
+
+.om-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
+  gap: var(--om-gap);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .om-metrics,
+  .om-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.om-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.om-filters__label {
+  color: var(--om-label);
+}
+
+.om-sugar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+/* Beats Blueprint's striped-row background, which also paints the cell. */
+.om-table tbody tr.om-row--selected td {
+  background: rgba(45, 114, 210, 0.12) !important;
+}
+
+.om-placeholder {
+  padding: 32px 16px;
+}
+
+/* --- batch detail panel -------------------------------------------------- */
+
+.om-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--om-gap);
+  min-width: 0;
+}
+
+/* The panel is narrow, so its label column gives way to the value. */
+.om-panel .om-field {
+  grid-template-columns: 130px minmax(0, 1fr);
+}
+
+.om-list--plain {
+  padding: 0;
+}
+
+.om-curve {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.om-maintenance,
+.om-test {
+  padding: 10px 0;
+  border-top: 1px solid var(--om-border);
+}
+
+.om-maintenance__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.om-audit {
+  border-top: 1px solid var(--om-border);
+}
+
+.om-audit:first-child {
+  border-top: 0;
+}
+
+.om-audit__head.bp6-button {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  flex-wrap: wrap;
+}
+
+.om-audit__action {
+  font-weight: 500;
+}
+
+.om-audit__when {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.om-audit__body {
+  padding: 0 16px 12px 40px;
+}
+
+.om-audit__empty {
+  padding: 16px;
+}
+
+.om-json-block {
+  margin: 4px 0 10px;
+  padding: 8px 10px;
+  border-radius: 3px;
+  background: rgba(143, 153, 168, 0.15);
+  font-size: 11px;
+  overflow-x: auto;
+}

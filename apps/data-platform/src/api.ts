@@ -128,8 +128,10 @@ export type InstanceDetail = {
   links: Record<string, ResolvedLink>;
 };
 
-export function listInstances(apiName: string): Promise<InstanceListing> {
-  return request(`/api/objects/${encodeURIComponent(apiName)}`);
+/** Query parameters are property filters, keyed by property api_name. */
+export function listInstances(apiName: string, filters?: Record<string, string>): Promise<InstanceListing> {
+  const query = filters ? new URLSearchParams(filters).toString() : "";
+  return request(`/api/objects/${encodeURIComponent(apiName)}${query ? `?${query}` : ""}`);
 }
 
 export function getInstance(apiName: string, id: string): Promise<InstanceDetail> {
@@ -157,4 +159,25 @@ export function invokeAction(
     headers: { "content-type": "application/json" },
     body: JSON.stringify(params),
   });
+}
+
+// --- audit ------------------------------------------------------------------
+
+export type AuditEntry = {
+  id: string;
+  /** The action's api_name as recorded when it ran. */
+  action: string;
+  /** Its display name now, or null if the action type has since been deleted. */
+  name: string | null;
+  actor: string | null;
+  params: Record<string, unknown> | null;
+  result: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export function getAudit(
+  apiName: string,
+  id: string,
+): Promise<{ type: string; id: string; count: number; data: AuditEntry[] }> {
+  return request(`/api/objects/${encodeURIComponent(apiName)}/${encodeURIComponent(id)}/audit`);
 }

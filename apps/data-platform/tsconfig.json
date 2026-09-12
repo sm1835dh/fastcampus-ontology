@@ -5,7 +5,7 @@
     "lib": ["es2024", "dom", "dom.iterable"],
     "jsx": "react-jsx",
     // import.meta.env and the ?url / ?raw import forms.
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
 }

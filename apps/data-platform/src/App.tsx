@@ -2,6 +2,7 @@ import { Callout, Spinner } from "@blueprintjs/core";
 import { useCallback, useEffect, useState } from "react";
 import { listObjectTypes, type ObjectType, type ObjectTypeListing } from "./api.ts";
 import AppSidebar, { type AppId } from "./components/AppSidebar.tsx";
+import BatchWorkspace from "./views/BatchWorkspace.tsx";
 import ObjectExplorer from "./views/ObjectExplorer.tsx";
 import OntologyManager from "./views/OntologyManager.tsx";
 
@@ -36,8 +37,10 @@ export default function App() {
         <Spinner className="om-spinner" />
       ) : app === "ontology-manager" ? (
         <OntologyManager types={types} onTypeUpdated={onTypeUpdated} />
-      ) : (
+      ) : app === "object-explorer" ? (
         <ObjectExplorer types={types} />
+      ) : (
+        <BatchWorkspace />
       )}
     </div>
   );
