@@ -81,3 +81,112 @@ export async function countInstances(table: InstanceTable): Promise<number> {
     .executeTakeFirstOrThrow();
   return Number(row.count);
 }
+
+/** The comparison operators the query route accepts. */
+export const FILTER_OPERATORS = [
+  "eq",
+  "neq",
+  "gt",
+  "gte",
+  "lt",
+  "lte",
+  "in",
+  "contains",
+  "isNull",
+  "isNotNull",
+] as const;
+
+export type FilterOperator = (typeof FILTER_OPERATORS)[number];
+
+export function isFilterOperator(value: unknown): value is FilterOperator {
+  return typeof value === "string" && (FILTER_OPERATORS as readonly string[]).includes(value);
+}
+
+/** A filter already resolved against metadata: a real column and a bound value. */
+export type QueryFilter = {
+  property: PropertyRow;
+  op: FilterOperator;
+  value: unknown;
+};
+
+/**
+ * Coerces a JSON body value for its property. Query strings arrive as text and
+ * go through coerceFilterValue; a JSON body may already carry the right type,
+ * so only the mismatches are converted.
+ */
+export function coerceJsonValue(property: PropertyRow, value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return coerceFilterValue(property, value);
+
+  switch (property.data_type) {
+    case "integer":
+    case "double": {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        throw new ApiError(400, `Filter '${property.api_name}' expects a number, got ${JSON.stringify(value)}`);
+      }
+      return parsed;
+    }
+    case "boolean": {
+      if (typeof value !== "boolean") {
+        throw new ApiError(400, `Filter '${property.api_name}' expects true or false.`);
+      }
+      return value;
+    }
+    default:
+      return value;
+  }
+}
+
+/**
+ * Filtered read. Property names reach this already resolved to metadata rows,
+ * so the only identifiers used are datasource columns, quoted by Kysely; every
+ * value is bound.
+ */
+export async function queryInstances(
+  view: TypeView,
+  filters: QueryFilter[],
+  limit: number | null,
+): Promise<InstanceRow[]> {
+  let query = selectProperties(view);
+
+  for (const filter of filters) {
+    const column = db.dynamic.ref(assertColumn(filter.property.datasource_column));
+
+    switch (filter.op) {
+      case "isNull":
+        query = query.where(column, "is", null);
+        break;
+      case "isNotNull":
+        query = query.where(column, "is not", null);
+        break;
+      case "in":
+        query = query.where(column, "in", filter.value);
+        break;
+      case "contains":
+        // Case-insensitive substring match; the route restricts this to text.
+        query = query.where(column, "ilike", `%${String(filter.value)}%`);
+        break;
+      case "neq":
+        query = query.where(column, "!=", filter.value);
+        break;
+      case "gt":
+        query = query.where(column, ">", filter.value);
+        break;
+      case "gte":
+        query = query.where(column, ">=", filter.value);
+        break;
+      case "lt":
+        query = query.where(column, "<", filter.value);
+        break;
+      case "lte":
+        query = query.where(column, "<=", filter.value);
+        break;
+      default:
+        query = query.where(column, "=", filter.value);
+    }
+  }
+
+  query = query.orderBy(db.dynamic.ref(view.primaryKeyColumn));
+  return limit === null ? query.execute() : query.limit(limit).execute();
+}

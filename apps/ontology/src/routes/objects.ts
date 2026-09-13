@@ -3,11 +3,16 @@
 import { Hono } from "hono";
 import { ApiError } from "../ontology/errors.ts";
 import {
+  FILTER_OPERATORS,
   coerceFilterValue,
+  coerceJsonValue,
   findInstance,
   findInstancesBy,
+  isFilterOperator,
   listInstances,
+  queryInstances,
   type Filter,
+  type QueryFilter,
 } from "../ontology/instances.ts";
 import {
   auditFor,
@@ -104,6 +109,101 @@ objects.get("/:type/:id", async (c) => {
     id,
     data: toApiObject(row, view.properties),
     links: Object.fromEntries(resolved),
+  });
+});
+
+/**
+ * Filtered read: `{ filters?: [{property, op, value}], limit?: number }`.
+ * Property names are resolved against metadata before anything reaches SQL.
+ */
+objects.post("/:type/query", async (c) => {
+  const loadType = typeViewCache();
+  const view = await loadType(c.req.param("type"));
+
+  const raw = await c.req.text();
+  let body: unknown = {};
+  if (raw.trim() !== "") {
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      throw new ApiError(400, "Request body must be JSON.");
+    }
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    throw new ApiError(400, "Request body must be a JSON object.");
+  }
+
+  const payload = body as { filters?: unknown; limit?: unknown };
+
+  let limit: number | null = null;
+  if (payload.limit !== undefined && payload.limit !== null) {
+    const parsed = Number(payload.limit);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1000) {
+      throw new ApiError(400, "'limit' must be an integer between 1 and 1000.");
+    }
+    limit = parsed;
+  }
+
+  const submitted = payload.filters ?? [];
+  if (!Array.isArray(submitted)) throw new ApiError(400, "'filters' must be an array.");
+
+  const filters: QueryFilter[] = submitted.map((entry, index): QueryFilter => {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new ApiError(400, `filters[${index}] must be an object.`);
+    }
+
+    const { property: name, op, value } = entry as { property?: unknown; op?: unknown; value?: unknown };
+
+    const property = view.properties.find((candidate) => candidate.api_name === name);
+    if (!property) {
+      const known = view.properties.map((candidate) => candidate.api_name).join(", ");
+      throw new ApiError(
+        400,
+        `filters[${index}] names unknown property '${String(name)}'. Known properties: ${known}`,
+      );
+    }
+    if (!isFilterOperator(op)) {
+      throw new ApiError(
+        400,
+        `filters[${index}] has unknown op '${String(op)}'. Known operators: ${FILTER_OPERATORS.join(", ")}`,
+      );
+    }
+
+    if (op === "isNull" || op === "isNotNull") return { property, op, value: null };
+
+    if (op === "in") {
+      if (!Array.isArray(value) || value.length === 0) {
+        throw new ApiError(400, `filters[${index}] with op 'in' needs a non-empty array value.`);
+      }
+      return { property, op, value: value.map((item) => coerceJsonValue(property, item)) };
+    }
+
+    if (op === "contains") {
+      // Substring matching only means something against text.
+      if (property.data_type !== "string") {
+        throw new ApiError(
+          400,
+          `filters[${index}]: 'contains' applies to text, and '${property.api_name}' is ${property.data_type}.`,
+        );
+      }
+      if (typeof value !== "string" || value === "") {
+        throw new ApiError(400, `filters[${index}] with op 'contains' needs a non-empty string.`);
+      }
+      return { property, op, value };
+    }
+
+    if (value === null || value === undefined) {
+      throw new ApiError(400, `filters[${index}] with op '${op}' needs a value.`);
+    }
+    return { property, op, value: coerceJsonValue(property, value) };
+  });
+
+  const rows = await queryInstances(view, filters, limit);
+
+  return c.json({
+    type: view.objectType.api_name,
+    count: rows.length,
+    data: rows.map((row) => toApiObject(row, view.properties)),
   });
 });
 
