@@ -27,6 +27,12 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.3.269
         version: 0.3.269(@anthropic-ai/sdk@0.125.0(zod@4.6.2))(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.6.2))(zod@4.6.2)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0
+      zod:
+        specifier: ^4.6.2
+        version: 4.6.2
 
   apps/data-platform:
     dependencies:
