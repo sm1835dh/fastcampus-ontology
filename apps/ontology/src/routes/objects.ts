@@ -8,6 +8,7 @@ import {
   coerceJsonValue,
   findInstance,
   findInstancesBy,
+  hintsForEmptyResult,
   isFilterOperator,
   listInstances,
   queryInstances,
@@ -200,10 +201,15 @@ objects.post("/:type/query", async (c) => {
 
   const rows = await queryInstances(view, filters, limit);
 
+  // Nothing matched is a valid answer, but it reads the same whether the filter
+  // was right or the value was misspelled. Hints separate the two.
+  const hints = rows.length === 0 && filters.length > 0 ? await hintsForEmptyResult(view, filters) : [];
+
   return c.json({
     type: view.objectType.api_name,
     count: rows.length,
     data: rows.map((row) => toApiObject(row, view.properties)),
+    ...(hints.length > 0 ? { hints } : {}),
   });
 });
 

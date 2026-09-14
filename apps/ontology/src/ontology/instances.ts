@@ -190,3 +190,115 @@ export async function queryInstances(
   query = query.orderBy(db.dynamic.ref(view.primaryKeyColumn));
   return limit === null ? query.execute() : query.limit(limit).execute();
 }
+
+/** What a caller most likely got wrong when a filtered read came back empty. */
+export type QueryHint = {
+  property: string;
+  op: FilterOperator;
+  submitted: unknown;
+  /** A stored value differing from what was sent only by case or padding. */
+  didYouMean?: string;
+  /** Every stored value, when the column holds few enough of them to list. */
+  values?: string[];
+  message: string;
+};
+
+// Only a text value can be off by case or spelling. A range comparison or a
+// null check that matches nothing is a fact about the data, not a mistake.
+const HINTABLE_OPS: readonly FilterOperator[] = ["eq", "in", "contains"];
+const MAX_LISTED_VALUES = 20;
+// Past this length a column is prose, not an enumeration.
+const MAX_VALUE_LENGTH = 60;
+
+/** Distinct non-null values of one column, capped. */
+async function distinctValues(view: TypeView, column: string, limit: number): Promise<string[]> {
+  const reference = db.dynamic.ref(assertColumn(column));
+  const rows = await db
+    .selectFrom(view.table)
+    .select(reference)
+    .distinct()
+    .where(reference, "is not", null)
+    .orderBy(reference)
+    .limit(limit)
+    .$castTo<InstanceRow>()
+    .execute();
+
+  return rows.map((row) => String(row[column]));
+}
+
+/** A stored value equal to `value` ignoring case: ilike with no wildcards. */
+async function caseInsensitiveMatch(view: TypeView, column: string, value: string): Promise<string | null> {
+  const reference = db.dynamic.ref(assertColumn(column));
+  const rows = await db
+    .selectFrom(view.table)
+    .select(reference)
+    .where(reference, "ilike", value)
+    .limit(1)
+    .$castTo<InstanceRow>()
+    .execute();
+
+  const first = rows[0];
+  return first === undefined ? null : String(first[column]);
+}
+
+/**
+ * An empty result is not an error, so nothing about it explains itself. Where a
+ * filter value is the likely culprit, say which values the column actually holds.
+ */
+export async function hintsForEmptyResult(view: TypeView, filters: QueryFilter[]): Promise<QueryHint[]> {
+  const hints: QueryHint[] = [];
+
+  for (const filter of filters) {
+    if (filter.property.data_type !== "string") continue;
+    if (!HINTABLE_OPS.includes(filter.op)) continue;
+
+    const submitted = Array.isArray(filter.value) ? filter.value : [filter.value];
+    const texts = submitted.filter((entry): entry is string => typeof entry === "string");
+    if (texts.length === 0) continue;
+
+    const column = filter.property.datasource_column;
+    const values = await distinctValues(view, column, MAX_LISTED_VALUES + 1);
+
+    // `complete` means every stored value is in hand, so a near-miss can be
+    // found without going back to the database. `enumerable` is the narrower
+    // question of whether those values are worth listing: `contains` searches
+    // free text, and a column of long strings is prose rather than a fixed set.
+    const complete = values.length <= MAX_LISTED_VALUES;
+    const enumerable =
+      complete && filter.op !== "contains" && values.every((value) => value.length <= MAX_VALUE_LENGTH);
+
+    let didYouMean: string | null = null;
+    for (const text of texts) {
+      const needle = text.trim().toLocaleLowerCase();
+      const found = complete
+        ? (values.find((value) => value.toLocaleLowerCase() === needle) ?? null)
+        : await caseInsensitiveMatch(view, column, text.trim());
+      if (found !== null) {
+        didYouMean = found;
+        break;
+      }
+    }
+
+    // Neither a near-miss nor a listable set: a substring that matches nothing
+    // is simply a fact about the data, and saying so adds nothing.
+    if (didYouMean === null && !enumerable) continue;
+
+    const name = filter.property.api_name;
+    const sent = JSON.stringify(filter.value);
+    const message =
+      didYouMean !== null
+        ? `No ${view.objectType.api_name} matched ${name} ${filter.op} ${sent}. Values are case-sensitive; ${JSON.stringify(didYouMean)} exists.`
+        : `No ${view.objectType.api_name} matched ${name} ${filter.op} ${sent}. Stored values: ${values.map((value) => JSON.stringify(value)).join(", ")}.`;
+
+    hints.push({
+      property: name,
+      op: filter.op,
+      submitted: filter.value,
+      ...(didYouMean !== null ? { didYouMean } : {}),
+      ...(enumerable ? { values } : {}),
+      message,
+    });
+  }
+
+  return hints;
+}
