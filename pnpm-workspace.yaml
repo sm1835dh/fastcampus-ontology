@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+allowBuilds:
+  # Its postinstall is not needed when consuming the published package.
+  protobufjs: false
