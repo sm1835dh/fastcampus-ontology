@@ -99,6 +99,8 @@ create table manufacturing.maintenance_log (
   target_id    text not null,
   type         text not null,
   status       text not null,
+  -- When the work is meant to happen. A scheduled log has this and no start.
+  planned_at   timestamptz,
   started_at   timestamptz,
   completed_at timestamptz,
   notes        text
@@ -271,6 +273,7 @@ from (values
   ('maintenanceLog', 'targetId', 'Target ID', 'string', true, false, false, 'target_id'),
   ('maintenanceLog', 'type', 'Type', 'string', true, false, false, 'type'),
   ('maintenanceLog', 'status', 'Status', 'string', true, false, false, 'status'),
+  ('maintenanceLog', 'plannedAt', 'Planned At', 'timestamp', false, false, false, 'planned_at'),
   ('maintenanceLog', 'startedAt', 'Started At', 'timestamp', false, false, false, 'started_at'),
   ('maintenanceLog', 'completedAt', 'Completed At', 'timestamp', false, false, false, 'completed_at'),
   ('maintenanceLog', 'notes', 'Notes', 'string', false, false, false, 'notes'),
@@ -345,6 +348,36 @@ select ot.id, 'deferStart', 'Defer Start', 'Postpone the batch''s planned start 
   )
 from manufacturing.object_type ot
 where ot.api_name = 'batch';
+
+-- Keep this in step with ScheduleMaintenanceParams in the handler: the route
+-- validates the body against this schema before dispatching.
+insert into manufacturing.action_type (object_type_id, api_name, name, description, parameter_schema)
+select ot.id, 'scheduleMaintenance', 'Schedule Maintenance',
+  'Take the tank offline and record a scheduled maintenance visit',
+  jsonb_build_object(
+    '$schema', 'https://json-schema.org/draft/2020-12/schema',
+    'type', 'object',
+    'properties', jsonb_build_object(
+      'type', jsonb_build_object(
+        'type', 'string',
+        'enum', jsonb_build_array('inspection', 'preventive', 'corrective', 'cleaning'),
+        'description', 'What kind of maintenance is being scheduled'
+      ),
+      'plannedAt', jsonb_build_object(
+        'type', 'string',
+        'format', 'date-time',
+        'description', 'When the work is planned, as an ISO 8601 datetime'
+      ),
+      'notes', jsonb_build_object(
+        'type', 'string',
+        'description', 'Why the visit is being scheduled, and anything the technician should know'
+      )
+    ),
+    'required', jsonb_build_array('type', 'plannedAt', 'notes'),
+    'additionalProperties', false
+  )
+from manufacturing.object_type ot
+where ot.api_name = 'tank';
 
 -- ---------------------------------------------------------------------------
 -- Instance data

@@ -155,6 +155,7 @@ export interface ManufacturingMaintenanceLogTable {
   target_id: string;
   type: string;
   status: string;
+  planned_at: Date | null;
   started_at: Date | null;
   completed_at: Date | null;
   notes: string | null;
