@@ -8,12 +8,15 @@ import { LangfuseSpanProcessor, isDefaultExportSpan, type ShouldExportSpan } fro
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import * as ClaudeAgentSDKModule from "@anthropic-ai/claude-agent-sdk";
-import { createSdkMcpServer, type Options, type PermissionResult } from "@anthropic-ai/claude-agent-sdk";
+import {
+  createSdkMcpServer,
+  type Options,
+  type PermissionResult,
+  type SdkMcpToolDefinition,
+} from "@anthropic-ai/claude-agent-sdk";
 import { buildSchemaBlock } from "./helpers/buildSchemaBlock.ts";
 import { startRunViewer, type RunEvent, type RunViewer } from "./runViewer.ts";
-import { getObject } from "./tools/shared/getObject.ts";
 import { ontologyApiBase } from "./tools/shared/ontologyApi.ts";
-import { queryObjects } from "./tools/shared/queryObjects.ts";
 
 // Langfuse reads these off the span; they are plain strings in its OTel contract.
 const LANGFUSE_TRACE_NAME = "langfuse.trace.name";
@@ -69,19 +72,23 @@ export function warnIfClockAnchored(): string | null {
 }
 
 const MCP_SERVER = "ontology";
-const OUR_TOOL_PREFIX = `mcp__${MCP_SERVER}__`;
-const OUR_TOOLS = [`${OUR_TOOL_PREFIX}query_objects`, `${OUR_TOOL_PREFIX}get_object`];
+
+/** An SDK MCP tool reaches the model as mcp__<server>__<tool>. */
+export function wireName(tool: SdkMcpToolDefinition<any>): string {
+  return `mcp__${MCP_SERVER}__${tool.name}`;
+}
 
 /**
- * The one permission decision. Our tools run unasked; everything else — Bash,
- * Read, any other MCP server — is refused rather than queued for a human who is
- * not watching. Exported so the rule can be tested without spending a model turn.
+ * The one permission decision, made against the tools this agent was given.
+ * They run unasked; everything else — Bash, Read, another MCP server — is
+ * refused rather than queued for a human who is not watching. Exported so the
+ * rule can be tested without spending a model turn.
  */
-export function toolPermission(toolName: string): PermissionResult {
-  if (toolName.startsWith(OUR_TOOL_PREFIX)) return { behavior: "allow" };
+export function toolPermission(toolName: string, allowed: readonly string[]): PermissionResult {
+  if (allowed.includes(toolName)) return { behavior: "allow" };
   return {
     behavior: "deny",
-    message: `${toolName} is not available. This agent may only use the ${MCP_SERVER} tools: ${OUR_TOOLS.join(", ")}.`,
+    message: `${toolName} is not available. This agent may only use: ${allowed.join(", ")}.`,
   };
 }
 
@@ -89,6 +96,10 @@ export type RunAgentParams = {
   /** Names the Langfuse trace and identifies this agent to the ontology API. */
   identity: string;
   prompt: string;
+  /** The agent's own tools. The MCP server and the permission gate come from these. */
+  tools: SdkMcpToolDefinition<any>[];
+  /** The agent's role instructions, appended after the injected schema and date. */
+  systemPrompt?: string;
   /** Merged over the defaults; anything here wins. */
   options?: Partial<Options>;
 };
@@ -147,7 +158,7 @@ function startTelemetry(): { sdk: NodeSDK | null; query: typeof ClaudeAgentSDKMo
  * The schema leads, inside a tag so the model can tell this injected reference
  * from the rest of the prompt. The date override follows it.
  */
-export function buildSystemPrompt(schemaBlock: string): string {
+export function buildSystemPrompt(schemaBlock: string, role?: string): string {
   const sections: string[] = [`<ontology-schema>\n${schemaBlock}\n</ontology-schema>`];
   const courseNow = process.env["COURSE_NOW"];
 
@@ -167,6 +178,7 @@ export function buildSystemPrompt(schemaBlock: string): string {
     );
   }
 
+  if (role) sections.push(role);
   return sections.join("\n\n");
 }
 
@@ -178,7 +190,7 @@ const now = () => new Date().toISOString();
 const truncate = (text: string, max = 300) =>
   text.length > max ? `${text.slice(0, max)}… (${text.length} chars)` : text;
 
-export async function runAgent({ identity, prompt, options }: RunAgentParams): Promise<void> {
+export async function runAgent({ identity, prompt, tools, systemPrompt, options }: RunAgentParams): Promise<void> {
   // Before telemetry starts, so the warning reads ahead of "tracing: on".
   warnIfClockAnchored();
   installOntologyFetchInterceptor(identity);
@@ -188,11 +200,8 @@ export async function runAgent({ identity, prompt, options }: RunAgentParams): P
   console.log(`▸ ${identity}\n▸ watch: ${viewer.url}\n`);
 
   const schemaBlock = await buildSchemaBlock();
-  const ontology = createSdkMcpServer({
-    name: MCP_SERVER,
-    version: "0.0.0",
-    tools: [queryObjects, getObject],
-  });
+  const ontology = createSdkMcpServer({ name: MCP_SERVER, version: "0.0.0", tools });
+  const allowed = tools.map(wireName);
 
   publish(viewer, { kind: "start", identity, prompt, at: now() });
 
@@ -209,7 +218,11 @@ export async function runAgent({ identity, prompt, options }: RunAgentParams): P
         prompt,
         options: {
           model: "claude-opus-5",
-          systemPrompt: { type: "preset", preset: "claude_code", append: buildSystemPrompt(schemaBlock) },
+          systemPrompt: {
+            type: "preset",
+            preset: "claude_code",
+            append: buildSystemPrompt(schemaBlock, systemPrompt),
+          },
           mcpServers: { [MCP_SERVER]: ontology },
           // `tools` decides what exists; Bash and Read are named as forbidden on
           // top of that. Permission is left to one gate: canUseTool approves our
@@ -219,11 +232,11 @@ export async function runAgent({ identity, prompt, options }: RunAgentParams): P
           // Our tools are deliberately NOT in allowedTools: a bare name there
           // auto-approves before the callback runs, which would shadow the gate
           // (the SDK warns about exactly this) and leave the deny path untested.
-          tools: OUR_TOOLS,
+          tools: allowed,
           disallowedTools: ["Bash", "Read"],
           // No updatedInput on allow: returning one would replace the arguments
           // the model actually sent.
-          canUseTool: async (toolName) => toolPermission(toolName),
+          canUseTool: async (toolName) => toolPermission(toolName, allowed),
           ...options,
         },
       });
