@@ -640,3 +640,13 @@ body {
   margin-top: 6px;
   max-width: 260px;
 }
+
+/* The server's refusal reads as the error; what to do about it reads as a
+   separate, quieter line beneath it. */
+.om-proposals__guidance {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(143, 153, 168, 0.35);
+  font-weight: 400;
+  opacity: 0.9;
+}

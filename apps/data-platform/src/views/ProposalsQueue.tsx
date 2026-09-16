@@ -7,7 +7,7 @@
 // leaves the row exactly where it was, and says why next to it.
 import { Button, ButtonGroup, Callout, HTMLTable, NonIdealState, Spinner, Tag } from "@blueprintjs/core";
 import { useCallback, useEffect, useState } from "react";
-import { invokeAction, listInstances, type InstanceRow } from "../api.ts";
+import { ApiRequestError, invokeAction, listInstances, type InstanceRow } from "../api.ts";
 import { formatTimestamp } from "../format.ts";
 
 /**
@@ -35,6 +35,50 @@ export function formatParams(value: unknown): string {
     .join("\n");
 }
 
+/** A decision that did not go through: what the server said, and what to do now. */
+export type DecisionFailure = { message: string; guidance: string | null };
+
+/**
+ * What the reviewer should do next, given how the decision failed.
+ *
+ * The server says why it refused, which is a fact about the domain and reads
+ * the same however the action was invoked. It cannot say what to do about it,
+ * because it does not know the caller is a reviewer looking at a queue -- the
+ * same refusal reaches curl and the object explorer, where "reject the
+ * proposal" would be nonsense. So the advice is added here, by the screen that
+ * knows what the click meant.
+ *
+ * Split by status because the right move genuinely differs: a refusal means the
+ * proposal can no longer be carried out, while a server fault means nothing
+ * happened and trying again is reasonable.
+ *
+ * Exported and pure so the wording can be checked without driving the UI.
+ */
+export function decisionGuidance(decision: "approve" | "reject", status: number | null): string | null {
+  if (decision === "reject") {
+    // Rejecting reads and updates the proposal alone -- it never dispatches the
+    // underlying action -- so a failure here is not the world having moved on.
+    return status !== null && status < 500
+      ? null
+      : "Rejecting only touches the proposal itself, so this is very likely temporary. Try again.";
+  }
+
+  switch (status) {
+    case 409:
+      return "What this targets has moved on since it was proposed, so the action can no longer run. Reject the proposal to close it out — its reasoning stays on record either way.";
+    case 400:
+      return "The parameters stored on this proposal no longer satisfy the action's rules. Reject this one; acting now would need a fresh proposal.";
+    case 404:
+      return "Either the proposal or the object it targets is gone. Reload the queue to see where things stand.";
+    case 422:
+      return "No handler is registered for this action, so nothing can carry it out. That is a server configuration problem rather than a decision for you to make.";
+    default:
+      return status !== null && status >= 500
+        ? "The server failed rather than refused, so nothing was changed. Try again."
+        : null;
+  }
+}
+
 /** The id as the invoke route needs it: proposal keys are generated integers. */
 function proposalId(row: InstanceRow): string {
   return String(row["id"]);
@@ -45,7 +89,7 @@ export default function ProposalsQueue() {
   const [error, setError] = useState<string | null>(null);
   // Keyed by proposal id: a decision that failed explains itself on its own row
   // instead of replacing the page.
-  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [rowErrors, setRowErrors] = useState<Record<string, DecisionFailure>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -81,10 +125,15 @@ export default function ProposalsQueue() {
         await load();
       } catch (cause: unknown) {
         // Deliberately no optimistic update to undo: the row was never moved,
-        // so it stays pending and simply gains an explanation.
+        // so it stays pending and simply gains an explanation -- and, where the
+        // failure implies one, a next step.
+        const status = cause instanceof ApiRequestError ? cause.status : null;
         setRowErrors((current) => ({
           ...current,
-          [id]: cause instanceof Error ? cause.message : String(cause),
+          [id]: {
+            message: cause instanceof Error ? cause.message : String(cause),
+            guidance: decisionGuidance(action, status),
+          },
         }));
       } finally {
         setBusy(null);
@@ -158,7 +207,10 @@ export default function ProposalsQueue() {
                     </Tag>
                     {failure ? (
                       <Callout intent="danger" compact className="om-alert om-proposals__error">
-                        {failure}
+                        {failure.message}
+                        {failure.guidance ? (
+                          <div className="om-proposals__guidance">{failure.guidance}</div>
+                        ) : null}
                       </Callout>
                     ) : null}
                   </td>
