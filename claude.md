@@ -12,6 +12,8 @@ Don't add packages by writing them directly into a `package.json`.
 - Importing the ontology app into another process patches that process's global `Date`. Agent and telemetry processes must not do it: OpenTelemetry stamps spans with `Date`, and a collector silently drops spans dated months out of its ingestion window, so tracing disappears with no error. Run the ontology API as its own process and point `ONTOLOGY_URL` at it. `runAgent` warns when it detects the skew.
 - Run agent files with the project root .env file.
 - An action has two halves: a handler in `apps/ontology/src/actions/...` and an `action_type` metadata row holding its `parameter_schema` (JSON Schema). The invoke route reads the metadata to validate and dispatch, so a handler with no row is unreachable and its audit write fails. Add both together, apply the metadata INSERT via a temporary SQL file applied with `run-sql` (not the read-only Neon MCP), and keep the schema and the handler's params in sync.
+- A new object type has two halves: an instance table in the target ontology schema and metadata rows (`object_type` + `property` rows, plus `link` rows if it references other types). The generic routes discover types from `object_type`, read columns from `property`, and resolve links from `link`. A table with no metadata is invisible to the API and UI. Add both together in a temporary SQL file applied with `run-sql`.
+
 
 ## Working agreements
 

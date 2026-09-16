@@ -152,12 +152,36 @@ export function invokeAction(
   id: string,
   actionApiName: string,
   params: Record<string, unknown>,
+  /**
+   * Who to attribute the action to. The server reads it from x-caller-identity
+   * and records it as the audit actor -- for an approval that identity is the
+   * reviewer, and it is threaded into the action the approval triggers.
+   */
+  callerIdentity?: string,
 ): Promise<ActionResult> {
   const path = [typeApiName, id, "actions", actionApiName].map(encodeURIComponent).join("/");
   return request(`/api/objects/${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(callerIdentity ? { "x-caller-identity": callerIdentity } : {}),
+    },
     body: JSON.stringify(params),
+  });
+}
+
+/**
+ * Creates an instance of any type. The body is keyed by property api_name; the
+ * route validates it against that type's metadata before inserting.
+ */
+export function createInstance(
+  typeApiName: string,
+  values: Record<string, unknown>,
+): Promise<{ type: string; id: string; data: InstanceRow }> {
+  return request(`/api/objects/${encodeURIComponent(typeApiName)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(values),
   });
 }
 

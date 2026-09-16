@@ -5,6 +5,7 @@ import AppSidebar, { type AppId } from "./components/AppSidebar.tsx";
 import BatchWorkspace from "./views/BatchWorkspace.tsx";
 import ObjectExplorer from "./views/ObjectExplorer.tsx";
 import OntologyManager from "./views/OntologyManager.tsx";
+import ProposalsQueue from "./views/ProposalsQueue.tsx";
 
 export default function App() {
   const [app, setApp] = useState<AppId>("ontology-manager");
@@ -39,6 +40,8 @@ export default function App() {
         <OntologyManager types={types} onTypeUpdated={onTypeUpdated} />
       ) : app === "object-explorer" ? (
         <ObjectExplorer types={types} />
+      ) : app === "proposals-queue" ? (
+        <ProposalsQueue />
       ) : (
         <BatchWorkspace />
       )}

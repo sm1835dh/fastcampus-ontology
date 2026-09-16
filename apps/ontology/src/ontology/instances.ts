@@ -73,6 +73,82 @@ export function coerceFilterValue(property: PropertyRow, raw: string): unknown {
   }
 }
 
+/** A column and the value bound for it, already resolved against metadata. */
+export type InsertValue = { column: string; value: unknown };
+
+/**
+ * Turns a create body keyed by property api_name into columns and values.
+ *
+ * Named and exported rather than inlined into the route so the rules can be
+ * checked directly: which keys are refused, which are required, and how each
+ * declared data_type is converted.
+ *
+ * The primary key is the one property that may be absent. Some instance tables
+ * carry a domain id the caller supplies (`T-12`); `proposal` generates its own.
+ * Metadata does not record which is which, so an omitted key is left to the
+ * database rather than guessed at here.
+ */
+export function resolveCreateValues(view: TypeView, body: Record<string, unknown>): InsertValue[] {
+  const known = view.properties.map((property) => property.api_name);
+
+  for (const key of Object.keys(body)) {
+    if (!known.includes(key)) {
+      throw new ApiError(
+        400,
+        `Unknown property '${key}' on '${view.objectType.api_name}'. Known properties: ${known.join(", ")}`,
+      );
+    }
+  }
+
+  const values: InsertValue[] = [];
+
+  for (const property of view.properties) {
+    const supplied = Object.prototype.hasOwnProperty.call(body, property.api_name);
+    const raw = body[property.api_name];
+
+    if (!supplied || raw === null || raw === undefined) {
+      if (property.is_primary_key) continue;
+      if (property.required) {
+        throw new ApiError(400, `Property '${property.api_name}' is required on '${view.objectType.api_name}'.`);
+      }
+      // An optional property left out is left out: writing an explicit null
+      // would override any default the column declares.
+      if (!supplied) continue;
+      values.push({ column: property.datasource_column, value: null });
+      continue;
+    }
+
+    // A json column takes text; everything else goes through the same coercion
+    // the read routes use, so one declared type means one conversion.
+    const value =
+      property.data_type === "json" && typeof raw !== "string"
+        ? JSON.stringify(raw)
+        : coerceJsonValue(property, raw);
+
+    values.push({ column: property.datasource_column, value });
+  }
+
+  return values;
+}
+
+/** Inserts one row and returns it as stored. */
+export async function insertInstance(view: TypeView, values: InsertValue[]): Promise<InstanceRow> {
+  const record: Record<string, unknown> = {};
+  for (const { column, value } of values) {
+    record[assertColumn(column)] = value;
+  }
+
+  // The table and every column came from metadata and through assertColumn, so
+  // the shape is known to be valid even though it cannot be typed statically.
+  const inserted = await db
+    .insertInto(view.table)
+    .values(record as never)
+    .returningAll()
+    .executeTakeFirstOrThrow();
+
+  return inserted as unknown as InstanceRow;
+}
+
 /** Row count for one instance table, for the type listing. */
 export async function countInstances(table: InstanceTable): Promise<number> {
   const row = await db

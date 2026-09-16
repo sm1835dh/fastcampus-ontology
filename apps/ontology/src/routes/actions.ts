@@ -50,12 +50,21 @@ actions.post("/:type/:id/actions/:actionName", async (c) => {
   const handler = actionHandlers[key];
   if (!handler) throw new ApiError(501, `Action '${key}' is declared in metadata but has no handler.`);
 
+  // Both spellings, because two kinds of caller exist: a human's curl or the UI
+  // sends x-actor, while runAgent tags every agent call with x-caller-identity.
+  // Reading only one of them recorded a whole class of writes as "anonymous"
+  // once already, so neither is read alone.
+  const callerIdentity = c.req.header("x-caller-identity") ?? c.req.header("x-actor");
+
   const updated = await handler(instance, params as Record<string, unknown>, {
     db,
     objectType: view.objectType,
     actionType,
     // No auth yet; the caller names itself so the audit trail is not blank.
-    actor: c.req.header("x-actor") ?? "anonymous",
+    actor: c.req.header("x-actor") ?? c.req.header("x-caller-identity") ?? "anonymous",
+    // Narrowed to a string before it goes in: under exactOptionalPropertyTypes
+    // an optional property may be absent, but not present-and-undefined.
+    ...(callerIdentity === undefined ? {} : { callerIdentity }),
   });
 
   return c.json({

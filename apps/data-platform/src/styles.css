@@ -590,3 +590,53 @@ body {
   font-size: 11px;
   overflow-x: auto;
 }
+
+/* --- Proposals queue ------------------------------------------------------ */
+
+.om-proposals {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 24px;
+  overflow: auto;
+}
+
+.om-proposals__header {
+  margin-bottom: 14px;
+}
+
+.om-proposals__title {
+  margin: 0 0 2px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.om-proposals__table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.om-proposals__table td {
+  vertical-align: top;
+}
+
+/* Rationale is prose and the longest column; it wraps rather than stretching
+   the table past the viewport. */
+.om-proposals__rationale {
+  white-space: pre-wrap;
+  min-width: 220px;
+}
+
+.om-proposals__params {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 3px;
+  background: rgba(143, 153, 168, 0.15);
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.om-proposals__error {
+  margin-top: 6px;
+  max-width: 260px;
+}

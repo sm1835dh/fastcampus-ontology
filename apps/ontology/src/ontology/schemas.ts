@@ -22,6 +22,7 @@ const INSTANCE_TABLES = [
   "manufacturing.bottling_run",
   "manufacturing.quality_test",
   "manufacturing.maintenance_log",
+  "manufacturing.proposal",
 ] as const satisfies readonly InstanceTable[];
 
 const INSTANCE_TABLE_SET: ReadonlySet<string> = new Set(INSTANCE_TABLES);

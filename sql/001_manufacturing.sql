@@ -379,6 +379,35 @@ select ot.id, 'scheduleMaintenance', 'Schedule Maintenance',
 from manufacturing.object_type ot
 where ot.api_name = 'tank';
 
+-- Keep this in step with AlertOperatorParams in the handler: the route
+-- validates the body against this schema before dispatching.
+--
+-- Unlike the two above, this action's effect leaves the database entirely: it
+-- posts to WEBHOOK_URL and changes no row. Its audit entry is the whole record.
+insert into manufacturing.action_type (object_type_id, api_name, name, description, parameter_schema)
+select ot.id, 'alertOperator', 'Alert Operator',
+  'Send the batch''s assigned operator a message through an external system',
+  jsonb_build_object(
+    '$schema', 'https://json-schema.org/draft/2020-12/schema',
+    'type', 'object',
+    'properties', jsonb_build_object(
+      'message', jsonb_build_object(
+        'type', 'string',
+        'minLength', 1,
+        'description', 'What the operator needs to know, in plain language'
+      ),
+      'severity', jsonb_build_object(
+        'type', 'string',
+        'enum', jsonb_build_array('info', 'warning', 'critical'),
+        'description', 'How urgently the operator should act on it'
+      )
+    ),
+    'required', jsonb_build_array('message', 'severity'),
+    'additionalProperties', false
+  )
+from manufacturing.object_type ot
+where ot.api_name = 'batch';
+
 -- ---------------------------------------------------------------------------
 -- Instance data
 --

@@ -9,6 +9,22 @@ export type ActionContext = {
   objectType: ObjectTypeRow;
   actionType: ActionTypeRow;
   actor: string;
+  /**
+   * Who this action is attributed to, which is not always who sent the request.
+   * Approving a proposal runs the underlying action on the approver's behalf,
+   * and threads their identity through here so the inner action's audit row
+   * names the person who authorised it rather than the machinery that ran it.
+   *
+   * Optional because an action can be invoked with nothing known about the
+   * caller; handlers decide what an unattributed run is called.
+   */
+  callerIdentity?: string;
+  /**
+   * The proposal this action is being run to carry out, when it is one. Folded
+   * into the audit entry by `auditResult` so the trail says not just who ran
+   * the action but what authorised it.
+   */
+  authorizedByProposal?: number;
 };
 
 /**

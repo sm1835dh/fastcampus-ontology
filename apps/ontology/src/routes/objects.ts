@@ -9,9 +9,11 @@ import {
   findInstance,
   findInstancesBy,
   hintsForEmptyResult,
+  insertInstance,
   isFilterOperator,
   listInstances,
   queryInstances,
+  resolveCreateValues,
   type Filter,
   type QueryFilter,
 } from "../ontology/instances.ts";
@@ -211,6 +213,44 @@ objects.post("/:type/query", async (c) => {
     data: rows.map((row) => toApiObject(row, view.properties)),
     ...(hints.length > 0 ? { hints } : {}),
   });
+});
+
+/**
+ * Creates an instance of any type. The body is keyed by property api_name and
+ * checked against that type's metadata; nothing type-specific lives here.
+ *
+ * Registered after `/:type/query` so the more specific path keeps its meaning.
+ */
+objects.post("/:type", async (c) => {
+  const loadType = typeViewCache();
+  const view = await loadType(c.req.param("type"));
+
+  const raw = await c.req.text();
+  if (raw.trim() === "") throw new ApiError(400, "Request body must be a JSON object.");
+
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw new ApiError(400, "Request body must be JSON.");
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    throw new ApiError(400, "Request body must be a JSON object.");
+  }
+
+  const values = resolveCreateValues(view, body as Record<string, unknown>);
+  const row = await insertInstance(view, values);
+
+  const id = row[view.primaryKeyColumn];
+
+  return c.json(
+    {
+      type: view.objectType.api_name,
+      id: id === null || id === undefined ? null : String(id),
+      data: toApiObject(row, view.properties),
+    },
+    201,
+  );
 });
 
 /** The action history for one object, newest first. */

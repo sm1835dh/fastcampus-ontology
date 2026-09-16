@@ -6,6 +6,8 @@ import type { Selectable } from "kysely";
 import type { ManufacturingBatchTable } from "../../db.ts";
 import { ApiError } from "../../ontology/errors.ts";
 import { METADATA_SCHEMA } from "../../ontology/schemas.ts";
+import { auditResult } from "../audit.ts";
+import { withTransaction } from "../transaction.ts";
 import { defineAction, type ActionContext } from "../types.ts";
 
 type BatchRow = Selectable<ManufacturingBatchTable>;
@@ -42,8 +44,9 @@ async function deferStart(
     );
   }
 
-  // The write and its audit row land together or not at all.
-  return context.db.transaction().execute(async (trx) => {
+  // The write and its audit row land together or not at all -- and when this
+  // runs inside an approval, together with that approval too.
+  return withTransaction(context.db, async (trx) => {
     const updated = await trx
       .updateTable("manufacturing.batch")
       .set({ planned_start: newPlannedStart })
@@ -62,12 +65,14 @@ async function deferStart(
         target_type_id: context.objectType.id,
         target_type_api_name: context.objectType.api_name,
         target_id: batch.id,
-        actor: context.actor,
+        actor: context.callerIdentity ?? "system",
         params: JSON.stringify(params),
-        result: JSON.stringify({
-          previousPlannedStart: batch.planned_start,
-          plannedStart: updated.planned_start,
-        }),
+        result: JSON.stringify(
+          auditResult(context, {
+            previousPlannedStart: batch.planned_start,
+            plannedStart: updated.planned_start,
+          }),
+        ),
       })
       .execute();
 

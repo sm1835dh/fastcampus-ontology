@@ -7,6 +7,7 @@ import type { Selectable, Transaction } from "kysely";
 import type { Database, ManufacturingTankTable } from "../../db.ts";
 import { ApiError } from "../../ontology/errors.ts";
 import { METADATA_SCHEMA } from "../../ontology/schemas.ts";
+import { withTransaction } from "../transaction.ts";
 import { defineAction, type ActionContext } from "../types.ts";
 
 type TankRow = Selectable<ManufacturingTankTable>;
@@ -24,7 +25,9 @@ type ScheduleMaintenanceParams = {
  * the second one gets a suffix rather than a 500.
  */
 async function nextLogId(trx: Transaction<Database>, tankId: string, plannedAt: Date): Promise<string> {
-  const base = `ML-${tankId}-${plannedAt.toISOString().slice(0, 10)}`;
+  // Ids read like the ones already in the table, which drop the tank's own
+  // hyphen: T-12 becomes ML-T12-<date>.
+  const base = `ML-${tankId.replace(/[^A-Za-z0-9]/g, "")}-${plannedAt.toISOString().slice(0, 10)}`;
 
   const taken = new Set(
     (
@@ -56,7 +59,7 @@ async function scheduleMaintenance(
     throw new ApiError(400, `plannedAt '${params.plannedAt}' is not a valid datetime.`);
   }
 
-  return context.db.transaction().execute(async (trx) => {
+  return withTransaction(context.db, async (trx) => {
     // Checked inside the transaction: a batch that starts fermenting between a
     // check outside it and the write would leave the tank offline underneath it.
     const fermenting = await trx

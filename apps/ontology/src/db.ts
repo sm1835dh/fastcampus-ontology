@@ -161,6 +161,28 @@ export interface ManufacturingMaintenanceLogTable {
   notes: string | null;
 }
 
+/**
+ * An action an agent wants taken, held for a human decision.
+ *
+ * The primary key is a generated integer rather than a domain id, which is the
+ * one exception to the text-id rule the other instance tables follow: a
+ * proposal has no identity out on the brewery floor, it only exists inside this
+ * queue. `type` holds a registry key like `batch.cancel`, case-sensitively.
+ */
+export interface ManufacturingProposalTable {
+  id: Generated<number>;
+  type: string;
+  target_id: string;
+  params: JSONColumnType<Record<string, unknown>>;
+  rationale: string;
+  status: Generated<string>;
+  proposed_by: string;
+  proposed_at: Generated<Date>;
+  reviewed_by: string | null;
+  reviewed_at: Date | null;
+  decision_note: string | null;
+}
+
 export interface Database {
   // Metadata: reached with withSchema().
   object_type: ObjectTypeTable;
@@ -178,6 +200,7 @@ export interface Database {
   "manufacturing.bottling_run": ManufacturingBottlingRunTable;
   "manufacturing.quality_test": ManufacturingQualityTestTable;
   "manufacturing.maintenance_log": ManufacturingMaintenanceLogTable;
+  "manufacturing.proposal": ManufacturingProposalTable;
 }
 
 const config = loadConfig();
